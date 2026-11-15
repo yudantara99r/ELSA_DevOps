@@ -26,6 +26,7 @@ class QuoteApiTest(unittest.TestCase):
     def setUp(self):
         with server._lock:
             server._requests.clear()
+            del server._durations[:]
 
     def get(self, path):
         url = "http://127.0.0.1:%d%s" % (self.port, path)
@@ -59,6 +60,9 @@ class QuoteApiTest(unittest.TestCase):
         self.assertIn("version=0.0.4", content_type)
         self.assertIn("# TYPE quote_requests_total counter", text)
         self.assertIn('quote_requests_total{path="/api/quote",code="200"} 1', text)
+        self.assertIn("# TYPE quote_request_duration_seconds histogram", text)
+        self.assertIn('quote_request_duration_seconds_bucket{le="+Inf"} 1', text)
+        self.assertIn("quote_request_duration_seconds_count 1", text)
 
     def test_unknown_path(self):
         with self.assertRaises(urllib.error.HTTPError) as caught:

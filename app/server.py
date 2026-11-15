@@ -21,6 +21,9 @@ QUOTES = (
 
 _lock = threading.Lock()
 _requests = {}
+_durations = []
+# Bounds are seconds. /api/quote burns about 100ms of CPU.
+_BUCKETS = ("0.05", "0.1", "0.15", "0.2", "0.3", "0.5", "1", "2")
 
 
 def burn_cpu(ms):
@@ -38,6 +41,11 @@ def record(path, code):
         _requests[key] = _requests.get(key, 0) + 1
 
 
+def observe(seconds):
+    with _lock:
+        _durations.append(seconds)
+
+
 def metrics_text():
     with _lock:
         items = sorted(_requests.items())
@@ -51,7 +59,28 @@ def metrics_text():
         lines.append(
             'quote_requests_total{path="%s",code="%s"} %d' % (path, code, count)
         )
+    lines.extend(histogram_lines())
     return "\n".join(lines) + "\n"
+
+
+def histogram_lines():
+    with _lock:
+        samples = list(_durations)
+    lines = [
+        "# HELP quote_request_duration_seconds Time spent serving /api/quote.",
+        "# TYPE quote_request_duration_seconds histogram",
+    ]
+    total = len(samples)
+    for label in _BUCKETS:
+        bound = float(label)
+        count = sum(1 for sample in samples if sample <= bound)
+        lines.append(
+            'quote_request_duration_seconds_bucket{le="%s"} %d' % (label, count)
+        )
+    lines.append('quote_request_duration_seconds_bucket{le="+Inf"} %d' % total)
+    lines.append("quote_request_duration_seconds_sum %.6f" % sum(samples))
+    lines.append("quote_request_duration_seconds_count %d" % total)
+    return lines
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -68,7 +97,9 @@ class Handler(BaseHTTPRequestHandler):
             body = metrics_text().encode()
             self._write(200, "text/plain; version=0.0.4; charset=utf-8", body)
         elif path == "/api/quote":
+            started = time.perf_counter()
             burn_cpu(CPU_MS)
+            observe(time.perf_counter() - started)
             body = (json.dumps({"quote": random.choice(QUOTES)}) + "\n").encode()
             self._reply(path, 200, "application/json", body)
         else:
