@@ -1,0 +1,27 @@
+replicaCount: 3
+
+image:
+  # Built from commit 3edcbe36. Publish this tag to GHCR before review.
+  repository: ghcr.io/yudantara99r/quote-api
+  tag: "3edcbe36ce954c91e8cf9f978155da888ca71eb7"
+  pullPolicy: IfNotPresent
+
+service:
+  port: 80
+
+ingress:
+  className: traefik
+  path: /
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 128Mi
+
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70

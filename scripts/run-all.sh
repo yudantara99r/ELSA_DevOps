@@ -7,3 +7,4 @@ reexec_in_toolbox "$@"
 
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 sh "$script_dir/00-bootstrap.sh"
+sh "$script_dir/20-deploy.sh"
