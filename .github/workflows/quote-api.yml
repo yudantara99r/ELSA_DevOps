@@ -29,7 +29,7 @@ jobs:
           docker run --rm
           -v "${{ github.workspace }}:/src"
           semgrep/semgrep:1.185.0
-          scan --config p/default --error --metrics=off /src/app
+          semgrep scan --config p/default --error --metrics=off /src/app
 
   image:
     if: github.event_name == 'pull_request'

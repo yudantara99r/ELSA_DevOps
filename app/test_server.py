@@ -1,11 +1,10 @@
 """Checks the quote API without a cluster."""
 
+import http.client
 import json
 import threading
 import time
 import unittest
-import urllib.error
-import urllib.request
 from http.server import ThreadingHTTPServer
 
 import server
@@ -29,12 +28,16 @@ class QuoteApiTest(unittest.TestCase):
             del server._durations[:]
 
     def get(self, path):
-        url = "http://127.0.0.1:%d%s" % (self.port, path)
         started = time.perf_counter()
-        with urllib.request.urlopen(url) as response:
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        try:
+            connection.request("GET", path)
+            response = connection.getresponse()
             body = response.read()
             elapsed = time.perf_counter() - started
-            return response.status, body, response.headers.get("Content-Type"), elapsed
+            return response.status, body, response.getheader("Content-Type"), elapsed
+        finally:
+            connection.close()
 
     def test_health_and_ready(self):
         status, body, _, _ = self.get("/healthz")
@@ -65,9 +68,9 @@ class QuoteApiTest(unittest.TestCase):
         self.assertIn("quote_request_duration_seconds_count 1", text)
 
     def test_unknown_path(self):
-        with self.assertRaises(urllib.error.HTTPError) as caught:
-            self.get("/missing")
-        self.assertEqual(caught.exception.code, 404)
+        status, body, _, _ = self.get("/missing")
+        self.assertEqual(status, 404)
+        self.assertEqual(body, b"not found\n")
 
 
 if __name__ == "__main__":
