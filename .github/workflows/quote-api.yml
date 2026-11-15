@@ -1,0 +1,92 @@
+name: quote-api
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Unit tests
+        working-directory: app
+        run: python -m unittest test_server.py
+
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Semgrep
+        run: >-
+          docker run --rm
+          -v "${{ github.workspace }}:/src"
+          semgrep/semgrep:1.185.0
+          scan --config p/default --error --metrics=off /src/app
+
+  image:
+    if: github.event_name == 'pull_request'
+    needs: [test, semgrep]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Build
+        run: docker build -t "quote-api:${{ github.sha }}" .
+      - name: Trivy
+        run: >-
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.76.2 image
+          --severity HIGH,CRITICAL
+          --exit-code 1
+          --ignore-unfixed
+          "quote-api:${{ github.sha }}"
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, semgrep]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/quote-api
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Build
+        run: docker build -t "quote-api:${{ github.sha }}" .
+      - name: Trivy
+        run: >-
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.76.2 image
+          --severity HIGH,CRITICAL
+          --exit-code 1
+          --ignore-unfixed
+          "quote-api:${{ github.sha }}"
+      - name: Log in to GHCR
+        uses: docker/login-action@v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push the git SHA
+        id: push
+        run: |
+          docker tag "quote-api:${{ github.sha }}" "${IMAGE}:${{ github.sha }}"
+          docker push "${IMAGE}:${{ github.sha }}"
+          digest=$(docker image inspect "${IMAGE}:${{ github.sha }}" --format '{{index .RepoDigests 0}}')
+          echo "digest=${digest##*@}" >> "$GITHUB_OUTPUT"
+      - uses: sigstore/cosign-installer@v4.1.3
+        with:
+          cosign-release: v3.1.4
+      - name: Sign the digest
+        run: cosign sign --yes "${IMAGE}@${{ steps.push.outputs.digest }}"
