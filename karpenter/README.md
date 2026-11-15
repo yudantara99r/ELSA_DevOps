@@ -1,0 +1,5 @@
+# GPU inference nodes
+
+Spot is the cheaper way to get g5 and g6 capacity, and Karpenter tries `gpu-spot` first because its weight is higher. A spot interruption terminates the instance, which cuts off an inference request that has not finished. On-demand costs more and is not reclaimed, so it is the fallback when spot capacity is missing and the right place for a request that cannot be retried. Both pools use `consolidationPolicy: WhenEmpty`. An underutilized GPU node is often still serving one live request, and replacing it to save money would interrupt that request. An empty node can be removed after five minutes. Nodes do not expire on a timer. A new AMI is a deliberate pin change, for the same reason: rolling every GPU node on a new image would drain in-flight inference.
+
+The manifests are in `karpenter/gpu.yaml`. They are an EKS design and are not applied to the local k3d cluster. The taint is `nvidia.com/gpu=true:NoSchedule`, the same key the NVIDIA device plugin and the Part 3 inference Pod already tolerate.
