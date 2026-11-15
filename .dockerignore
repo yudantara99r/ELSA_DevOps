@@ -1,0 +1,5 @@
+.git
+.cursor
+**/__pycache__
+**/*.pyc
+.docker-daemon.json
