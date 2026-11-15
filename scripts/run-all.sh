@@ -9,3 +9,4 @@ script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 sh "$script_dir/00-bootstrap.sh"
 sh "$script_dir/20-deploy.sh"
 sh "$script_dir/25-reclaim-drill.sh"
+sh "$script_dir/30-troubleshoot.sh"
