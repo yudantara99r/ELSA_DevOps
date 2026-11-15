@@ -1,0 +1,22 @@
+services:
+  toolbox:
+    build:
+      context: ./toolbox
+    image: elsa-toolbox:local
+    container_name: elsa-toolbox
+    hostname: elsa-toolbox
+    working_dir: /workspace
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/workspace
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      IN_TOOLBOX: "1"
+      CLUSTER_NAME: elsa
+      K3D_AGENTS: "4"
+      API_PORT: "6550"
+      INGRESS_PORT: "8080"
+      K3S_IMAGE: rancher/k3s:v1.37.2-k3s1
+      TOOLBOX_NAME: elsa-toolbox
+      KUBECONFIG: /root/.kube/config
