@@ -4,7 +4,8 @@ COPY app/server.py app/test_server.py /app/
 RUN python -m unittest test_server.py
 
 FROM python:3.13-alpine
-RUN adduser -D -u 10001 -h /app app
+RUN pip uninstall -y msgpack urllib3 setuptools pip \
+ && adduser -D -u 10001 -h /app app
 WORKDIR /app
 COPY --from=test /app/server.py /app/server.py
 USER 10001
