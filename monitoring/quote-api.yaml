@@ -1,0 +1,42 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: quote-api
+  namespace: quote-api
+  labels:
+    app.kubernetes.io/name: quote-api
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quote-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: quote-api
+  namespace: quote-api
+  labels:
+    app.kubernetes.io/name: quote-api
+spec:
+  groups:
+    - name: quote-api
+      rules:
+        - alert: QuoteApiErrors
+          # /api/quote returns 200. Stay quiet through one 5m window, then page
+          # if failures are still present. The load test confirms this line.
+          expr: |
+            (
+              sum(rate(quote_requests_total{namespace="quote-api",path="/api/quote",code!="200"}[5m]))
+              /
+              sum(rate(quote_requests_total{namespace="quote-api",path="/api/quote"}[5m]))
+            ) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Quote requests are failing
+            description: /api/quote has returned non-200 responses for 10 minutes.
